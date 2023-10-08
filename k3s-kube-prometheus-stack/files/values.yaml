@@ -1,0 +1,327 @@
+# full values: https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+
+# matched to service port 'prom-stack-kube-prometheus-kube-controller-manager' -n kube-system
+kubeControllerManager:
+  enabled: true
+  endpoints:
+    - 172.31.38.19
+  service:
+    enabled: true
+    port: 10257
+    targetPort: 10257
+  serviceMonitor:
+    enabled: true
+
+# matched to service port 'prom-stack-kube-prometheus-kube-scheduler' -n kube-system
+kubeScheduler:
+  enabled: true
+  endpoints:
+    - 172.31.38.19
+  service:
+    enabled: true
+    port: 10259
+    targetPort: 10259
+  serviceMonitor:
+    enabled: true
+
+# matched to service port 'prom-stack-kube-prometheus-kube-proxy' -n kube-system
+kubeProxy:
+  enabled: true
+  endpoints:
+    - 172.31.38.19
+    - 172.31.41.39
+  service:
+    enabled: true
+    port: 10249
+    targetPort: 10249
+
+#  If you use embedded etcd, you need to enable etcd monitoring
+kubeEtcd:
+  enabled: true
+  endpoints:
+    - 172.31.38.19
+
+alertmanager:
+  ingress:
+    enabled: true
+    hosts: ["alertmanager.kingsd.top"]
+    paths: ["/"]
+    tls:
+      - secretName: alertmanager-tls-credential
+        hosts:
+          - alertmanager.kingsd.top
+
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+  config:
+    global:
+      # 当alertmanager持续多长时间未接收到告警后标记告警状态为 resolved
+      resolve_timeout: 5m
+      # 配置邮件发送信息
+      smtp_smarthost: "smtp.qq.com:465"
+      smtp_from: "14375734@qq.com"
+      smtp_auth_username: "14375734@qq.com"
+      smtp_auth_password: "<password>"
+      # smtp_hello: '163.com'
+      smtp_require_tls: false
+    # 所有报警信息进入后的根路由，用来设置报警的分发策略
+    route:
+      # 这里的标签列表是接收到报警信息后的重新分组标签，例如，接收到的报警信息里面有许多具有 cluster=A 和 alertname=LatncyHigh 这样的标签的报警信息将会批量被聚合到一个分组里面
+      group_by: ["alertname", "cluster"]
+      # 当一个新的报警分组被创建后，需要等待至少 group_wait 时间来初始化通知，这种方式可以确保您能有足够的时间为同一分组来获取多个警报，然后一起触发这个报警信息。
+      group_wait: 30s
+
+      # 相同的group之间发送告警通知的时间间隔
+      group_interval: 30s
+
+      # 如果一个报警信息已经发送成功了，等待 repeat_interval 时间来重新发送他们，不同类型告警发送频率需要具体配置
+      repeat_interval: 1h
+
+      # 默认的receiver：如果一个报警没有被一个route匹配，则发送给默认的接收器
+      receiver: email_platform
+
+      # 上面所有的属性都由所有子路由继承，并且可以在每个子路由上进行覆盖。
+      routes:
+        - receiver: email_platform
+          group_wait: 10s
+          group_by: ["instance"] # 根据instance做分组
+          match:
+            team: node
+    receivers:
+      - name: "email_platform"
+        email_configs:
+          - to: "nicholas_ksd@hotmail.com"
+            send_resolved: true # 接受告警恢复的通知
+
+  # config:
+  #   global:
+  #     resolve_timeout: 5m
+  #     # global smtp settings
+  #     smtp_from: 14375734@qq.com
+  #     smtp_smarthost: smtp.qq.com:465
+  #     smtp_require_tls: false
+
+  #   route:
+  #     group_by: ['alertname']
+  #     group_wait: 20s # not default 30
+  #     group_interval: 30s # not default 5m
+  #     repeat_interval: 4h # not default 12h
+  #     receiver: email_platform
+  #     routes:
+  #     - receiver: 'null'
+  #       matchers:
+  #         - alertname =~ "InfoInhibitor|Watchdog"
+  #     - receiver: email_platform
+  #       continue: true
+  #   receivers:
+  #   - name: email_platform
+  #     email_configs:
+  #     - to: platform@k3s
+  #       send_resolved: true
+  #       headers:
+  #         subject: "{{ .Status | toUpper }} {{ .CommonLabels.env }}:{{ .CommonLabels.cluster }} {{ .CommonLabels.alertname }}"
+  #       #html: "{{ range .Alerts }}{{ .Annotations.description }}<br/>{{ end }}"
+  #       # proper syntax for external template ready by alertmanager
+  #       # defining both these values will send email in multipart/alternative
+  #       #html: '{{ template "emaildefaulthtml" . }}'
+  #       #text: '{{ template "emaildefaulttxt" . }}'
+
+  #   - name: 'null'
+  #   templates:
+  #   - '/etc/alertmanager/config/*.tmpl'
+
+prometheus:
+  ingress:
+    enabled: true
+    hosts: ["prometheus.kingsd.top"]
+    paths: ["/"]
+    tls:
+      - secretName: prometheus-tls-credential
+        hosts:
+          - prometheus.kingsd.top
+
+  prometheusSpec:
+    storageSpec:
+      ## Using PersistentVolumeClaim
+      ##
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    externalUrl: https://alertmanager.kingsd.top/
+    routePrefix: /
+
+    # additional scrape job
+    additionalScrapeConfigs:
+      # 监控 treafik
+      - job_name: traefik
+        kubernetes_sd_configs:
+          - { role: pod }
+        relabel_configs:
+          - action: keep
+            source_labels:
+              [
+                __meta_kubernetes_namespace,
+                __meta_kubernetes_pod_container_name,
+                __meta_kubernetes_pod_container_port_number,
+              ]
+            regex: kube-system;traefik;9900
+          - action: keep
+            regex: true
+            source_labels:
+              [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          - action: keep
+            regex: true
+            source_labels:
+              [__meta_kubernetes_pod_annotationpresent_prometheus_io_port]
+          - action: replace
+            source_labels: [__meta_kubernetes_pod_container_name]
+            separator: ;
+            regex: (.*)
+            target_label: container
+            replacement: $1
+          - action: replace
+            separator: ;
+            regex: (.*)
+            target_label: namespace
+            replacement: $1
+            source_labels: [__meta_kubernetes_namespace]
+          - action: replace
+            separator: ;
+            regex: Pod;(.*)
+            target_label: pod
+            replacement: ${1}
+            source_labels:
+              [
+                __meta_kubernetes_endpoint_address_target_kind,
+                __meta_kubernetes_endpoint_address_target_name,
+              ]
+          - action: replace
+            separator: ;
+            regex: Pod;(.*)
+            target_label: pod
+            replacement: ${1}
+            source_labels:
+              [
+                __meta_kubernetes_endpoint_address_target_kind,
+                __meta_kubernetes_endpoint_address_target_name,
+              ]
+          - action: replace
+            separator: ;
+            regex: (.*)
+            target_label: portname
+            replacement: $1
+            source_labels: [__meta_kubernetes_pod_container_port_name]
+          # 可将获取到的 port_number 映射在 prometheus targets 的 labels 上
+          - action: replace
+            separator: ;
+            regex: (.*)
+            target_label: port_number
+            replacement: $1
+            source_labels: [__meta_kubernetes_pod_container_port_number]
+      - job_name: kubernetes-pod-endpoints
+        kubernetes_sd_configs:
+          - { role: pod }
+        relabel_configs:
+          - action: keep
+            regex: true
+            source_labels:
+              [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          - action: keep
+            regex: true
+            source_labels:
+              [__meta_kubernetes_pod_annotationpresent_prometheus_io_port]
+          - action: drop
+            regex: (kube-system|monitoring)
+            source_labels: [__meta_kubernetes_namespace]
+          - action: replace
+            regex: (https?)
+            source_labels:
+              [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+            target_label: __scheme__
+          - action: replace
+            regex: (.+)
+            source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            target_label: __metrics_path__
+          - action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            source_labels:
+              [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            target_label: __address__
+          - { action: labelmap, regex: __meta_kubernetes_pod_label_(.+) }
+          - action: replace
+            source_labels: [__meta_kubernetes_namespace]
+            target_label: kubernetes_namespace
+          - action: replace
+            source_labels: [__meta_kubernetes_pod_name]
+            target_label: kubernetes_name
+      - job_name: kubernetes-service-endpoints
+        kubernetes_sd_configs:
+          - { role: service }
+        relabel_configs:
+          - action: keep
+            regex: true
+            source_labels:
+              [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+          - action: drop
+            regex: (kube-system|monitoring)
+            source_labels: [__meta_kubernetes_namespace]
+          - action: keep
+            regex: .*metrics
+            source_labels: [__meta_kubernetes_service_port_name]
+          - action: replace
+            regex: (https?)
+            source_labels:
+              [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+            target_label: __scheme__
+          - action: replace
+            regex: (.+)
+            source_labels:
+              [__meta_kubernetes_service_annotation_prometheus_io_path]
+            target_label: __metrics_path__
+          - action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            source_labels:
+              [
+                __address__,
+                __meta_kubernetes_service_annotation_prometheus_io_port,
+              ]
+            target_label: __address__
+          - { action: labelmap, regex: __meta_kubernetes_service_label_(.+) }
+          - action: replace
+            source_labels: [__meta_kubernetes_namespace]
+            target_label: kubernetes_namespace
+          - action: replace
+            source_labels: [__meta_kubernetes_service_name]
+            target_label: kubernetes_name
+
+grafana:
+  # username is 'admin'
+  adminPassword: prom-operator
+  ingress:
+    enabled: true
+    hosts: ["grafana.kingsd.top"]
+    path: "/"
+    tls:
+      - secretName: grafana-tls-credential
+        hosts:
+          - grafana.kingsd.top
+  persistence:
+    type: pvc
+    enabled: true
+    storageClassName: local-path
+    accessModes: ["ReadWriteOnce"]
+    size: 1024Mi
