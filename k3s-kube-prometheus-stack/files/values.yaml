@@ -1,14 +1,95 @@
 # full values: https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+customRules: {}
+defaultRules:
+  create: true
+  rules:
+    prometheus: true
+  disabled: {}
+  additionalRuleGroupLabels:
+    prometheus: {}
+  
+  additionalRuleGroupAnnotations:
+    prometheus: {}
+
+prometheusOperator:
+  enabled: true
+  tls:
+    enabled: true
+  serviceAccount:
+    automountServiceAccountToken: false
+    create: true
+    name: ""
+  service:
+    labels: {}
+    ipDualStack:
+      enabled: false
+  admissionWebhooks:
+    certManager:
+      enabled: false
+    deployment:
+      enabled: false
+    patch:
+      enabled: true
+      serviceAccount:
+        create: true
+        automountServiceAccountToken: true
+  networkPolicy:
+    enabled: false
+  kubeletService:
+    enabled: false
+  serviceMonitor:
+    selfMonitor: false
+  image:
+    registry: quay.io
+    repository: prometheus-operator/prometheus-operator
+    tag: ""
+    sha: ""
+    pullPolicy: IfNotPresent
+  prometheusConfigReloader:
+    image:
+      registry: quay.io
+      repository: prometheus-operator/prometheus-config-reloader
+      tag: ""
+      sha: ""
+  thanosImage:
+    registry: quay.io
+    repository: thanos/thanos
+    tag: v0.35.0
+    sha: ""
+
+
+global:
+  rbac:
+    create: true
+  imagePullSecrets: []
+
+windowsMonitoring:
+  enabled: false
 
 # matched to service port 'prom-stack-kube-prometheus-kube-controller-manager' -n kube-system
+coreDns:
+  enabled: true
+  service:
+    enabled: true
+    ipDualStack:
+      enabled: false
+  serviceMonitor:
+    enabled: true
+
+kubeDns:
+  enabled: false
+
 kubeControllerManager:
   enabled: true
   endpoints:
     - 172.31.38.19
   service:
     enabled: true
+    ipDualStack:
+      enabled: false
     port: 10257
     targetPort: 10257
+
   serviceMonitor:
     enabled: true
 
@@ -19,6 +100,8 @@ kubeScheduler:
     - 172.31.38.19
   service:
     enabled: true
+    ipDualStack:
+      enabled: false
     port: 10259
     targetPort: 10259
   serviceMonitor:
@@ -31,25 +114,57 @@ kubeProxy:
     - 172.31.38.19
     - 172.31.41.39
   service:
+    ipDualStack:
+      enabled: false
     enabled: true
     port: 10249
     targetPort: 10249
+  serviceMonitor:
+    enabled: true
 
 #  If you use embedded etcd, you need to enable etcd monitoring
 kubeEtcd:
   enabled: true
   endpoints:
     - 172.31.38.19
+  service:
+    enabled: true
+    ipDualStack:
+      enabled: false
+  serviceMonitor:
+    enabled: true
+
+kubelet:
+  enabled: true
+  serviceMonitor:
+    additionalLabels: {}
+
+kubeApiServer:
+  enabled: true
+  tlsConfig:
+    serverName: kubernetes
+  serviceMonitor:
+    additionalLabels: {}
+
+kubernetesServiceMonitors:
+  enabled: true
+
+thanosRuler:
+  enabled: false
+  extraSecret:
+    data: {}
 
 alertmanager:
+  extraSecret:
+    data: {}
   ingress:
     enabled: true
-    hosts: ["alertmanager.kingsd.top"]
+    hosts: ["alertmanager.twyfordtile.com"]
     paths: ["/"]
     tls:
       - secretName: alertmanager-tls-credential
         hosts:
-          - alertmanager.kingsd.top
+          - alertmanager.twyfordtile.com
 
   alertmanagerSpec:
     storage:
@@ -66,9 +181,9 @@ alertmanager:
       resolve_timeout: 5m
       # 配置邮件发送信息
       smtp_smarthost: "smtp.qq.com:465"
-      smtp_from: "14375734@qq.com"
-      smtp_auth_username: "14375734@qq.com"
-      smtp_auth_password: "<password>"
+      smtp_from: "1079463150@qq.com"
+      smtp_auth_username: "1079463150@qq.com"
+      smtp_auth_password: "ojiowpmtbjkfbach"
       # smtp_hello: '163.com'
       smtp_require_tls: false
     # 所有报警信息进入后的根路由，用来设置报警的分发策略
@@ -138,14 +253,20 @@ alertmanager:
   #   - '/etc/alertmanager/config/*.tmpl'
 
 prometheus:
+  thanosService:
+    enabled: false
+  networkPolicy:
+    enabled: false
+  extraSecret:
+    data: {}
   ingress:
     enabled: true
-    hosts: ["prometheus.kingsd.top"]
+    hosts: ["prometheus.twyfordtile.com"]
     paths: ["/"]
     tls:
       - secretName: prometheus-tls-credential
         hosts:
-          - prometheus.kingsd.top
+          - prometheus.twyfordtile.com
 
   prometheusSpec:
     storageSpec:
@@ -159,7 +280,7 @@ prometheus:
             requests:
               storage: 10Gi
 
-    externalUrl: https://alertmanager.kingsd.top/
+    externalUrl: https://alertmanager.twyfordtile.com/
     routePrefix: /
 
     # additional scrape job
@@ -308,20 +429,20 @@ prometheus:
             source_labels: [__meta_kubernetes_service_name]
             target_label: kubernetes_name
 
-grafana:
-  # username is 'admin'
-  adminPassword: prom-operator
-  ingress:
-    enabled: true
-    hosts: ["grafana.kingsd.top"]
-    path: "/"
-    tls:
-      - secretName: grafana-tls-credential
-        hosts:
-          - grafana.kingsd.top
-  persistence:
-    type: pvc
-    enabled: true
-    storageClassName: local-path
-    accessModes: ["ReadWriteOnce"]
-    size: 1024Mi
+# grafana:
+#   # username is 'admin'
+#   adminPassword: prom-operator
+#   ingress:
+#     enabled: true
+#     hosts: ["grafana.twyfordtile.com"]
+#     path: "/"
+#     tls:
+#       - secretName: grafana-tls-credential
+#         hosts:
+#           - grafana.twyfordtile.com
+#   persistence:
+#     type: pvc
+#     enabled: true
+#     storageClassName: local-path
+#     accessModes: ["ReadWriteOnce"]
+#     size: 1024Mi
