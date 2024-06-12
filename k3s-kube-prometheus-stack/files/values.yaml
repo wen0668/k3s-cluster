@@ -90,8 +90,11 @@ kubeControllerManager:
     enabled: true
     ipDualStack:
       enabled: false
+    ipDualStack:
+      enabled: false
     port: 10257
     targetPort: 10257
+
 
   serviceMonitor:
     enabled: true
@@ -103,6 +106,8 @@ kubeScheduler:
     - 172.31.38.19
   service:
     enabled: true
+    ipDualStack:
+      enabled: false
     ipDualStack:
       enabled: false
     port: 10259
@@ -119,9 +124,13 @@ kubeProxy:
   service:
     ipDualStack:
       enabled: false
+    ipDualStack:
+      enabled: false
     enabled: true
     port: 10249
     targetPort: 10249
+  serviceMonitor:
+    enabled: true
   serviceMonitor:
     enabled: true
 
@@ -167,13 +176,17 @@ thanosRuler:
 alertmanager:
   extraSecret:
     data: {}
+  extraSecret:
+    data: {}
   ingress:
     enabled: true
+    hosts: ["alertmanager.twyfordtile.com"]
     hosts: ["alertmanager.twyfordtile.com"]
     paths: ["/"]
     tls:
       - secretName: alertmanager-tls-credential
         hosts:
+          - alertmanager.twyfordtile.com
           - alertmanager.twyfordtile.com
 
   alertmanagerSpec:
@@ -191,6 +204,9 @@ alertmanager:
       resolve_timeout: 5m
       # 配置邮件发送信息
       smtp_smarthost: "smtp.qq.com:465"
+      smtp_from: "1079463150@qq.com"
+      smtp_auth_username: "1079463150@qq.com"
+      smtp_auth_password: "ojiowpmtbjkfbach"
       smtp_from: "1079463150@qq.com"
       smtp_auth_username: "1079463150@qq.com"
       smtp_auth_password: "ojiowpmtbjkfbach"
@@ -269,13 +285,21 @@ prometheus:
     enabled: false
   extraSecret:
     data: {}
+  thanosService:
+    enabled: false
+  networkPolicy:
+    enabled: false
+  extraSecret:
+    data: {}
   ingress:
     enabled: true
+    hosts: ["prometheus.twyfordtile.com"]
     hosts: ["prometheus.twyfordtile.com"]
     paths: ["/"]
     tls:
       - secretName: prometheus-tls-credential
         hosts:
+          - prometheus.twyfordtile.com
           - prometheus.twyfordtile.com
 
   prometheusSpec:
@@ -290,6 +314,7 @@ prometheus:
             requests:
               storage: 10Gi
 
+    externalUrl: https://alertmanager.twyfordtile.com/
     externalUrl: https://alertmanager.twyfordtile.com/
     routePrefix: /
 
